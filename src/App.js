@@ -67,7 +67,7 @@ function App() {
       const server_url = process.env.REACT_APP_TOKEN_SERVER_URL;
       const userId = `user-${Math.random().toString(36).substring(2, 8)}`;
       const roomId = `room-${Math.random().toString(36).substring(2, 8)}`;
-      const fullUrl = `${server_url}?room=${roomId}&user=${userId}`;
+      const fullUrl = `${server_url}room=${roomId}&user=${userId}`;
 
       console.log("Connecting via:", fullUrl);
 
