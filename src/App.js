@@ -12,92 +12,65 @@ function App() {
 
     const handleTrackSubscribed = (track, publication, participant) => {
       console.log(`Track subscribed: ${track.kind}`);
-  
+
       if (track.kind === Track.Kind.Audio) {
         setIsSpeaking(true);
-  
+
         const audioElement = track.attach();
         document.body.appendChild(audioElement);
-  
+
         audioElement.onended = () => {
           setIsSpeaking(false);
           audioElement.remove();
         };
       }
     };
-  
-    const handleTrackUnsubscribed = (track, publication, participant) => {
+
+    const handleTrackUnsubscribed = (track) => {
       console.log(`Track unsubscribed: ${track.kind}`);
-  
+
       if (track.kind === Track.Kind.Audio) {
         track.detach().forEach((element) => element.remove());
         setIsSpeaking(false);
       }
     };
-  
-    const handleDataReceived = (payload, participant, kind) => {
+
+    const handleDataReceived = (payload, participant) => {
       const message = new TextDecoder().decode(payload);
       console.log(`Data message received from ${participant.identity}: ${message}`);
-  
+
       setChatMessages(prev => [...prev, { sender: participant.identity, text: message }]);
     };
-  
-  
 
-    room.on('trackSubscribed', (track, publication, participant) => {
-      console.log(`Track subscribed: ${track.kind}`);
+    const handleDisconnected = () => {
+      console.log('Disconnected from room');
+      setConnected(false);
+      setRoom(null);
+      setChatMessages([]);
+    };
 
-      if (track.kind === Track.Kind.Audio) {
-        // Start Speaking Indicator
-        setIsSpeaking(true);
-
-        const audioElement = track.attach();
-        document.body.appendChild(audioElement);
-
-        // Simulate a chat message from agent
-        setChatMessages(prev => [...prev, { sender: participant.identity, text: "Agent is responding..." }]);
-
-        // Stop indicator when audio finishes playing (estimate)
-        audioElement.onended = () => {
-          setIsSpeaking(false);
-          audioElement.remove();
-        };
-      }
-    });
-
-    room.on('trackUnsubscribed', (track, publication, participant) => {
-      console.log(`Track unsubscribed: ${track.kind}`);
-
-      if (track.kind === Track.Kind.Audio) {
-        track.detach().forEach((element) => element.remove());
-        setIsSpeaking(false);
-      }
-    });
+    room.on('trackSubscribed', handleTrackSubscribed);
+    room.on('trackUnsubscribed', handleTrackUnsubscribed);
+    room.on('dataReceived', handleDataReceived);
+    room.on('disconnected', handleDisconnected);
 
     return () => {
       room.off('trackSubscribed', handleTrackSubscribed);
       room.off('trackUnsubscribed', handleTrackUnsubscribed);
       room.off('dataReceived', handleDataReceived);
+      room.off('disconnected', handleDisconnected);
     };
   }, [room]);
 
   const connectToRoom = async () => {
     try {
-      // const resp = await fetch(process.env.TOKEN_SERVER_URL);
       const server_url = process.env.REACT_APP_TOKEN_SERVER_URL;
-      console.log("Server url:", server_url);
-
-      // 1. Dynamically generate a unique user ID
       const userId = `user-${Math.random().toString(36).substring(2, 8)}`;
+      const roomId = `room-${Math.random().toString(36).substring(2, 8)}`;
+      const fullUrl = `${server_url}?room=${roomId}&user=${userId}`;
 
-      // 2. (Optional) Fixed room, or generate room dynamically if needed
-      const roomId = `room-${Math.random().toString(36).substring(2, 8)}`; // or generate your own: `room-${someUniqueId}`
+      console.log("Connecting via:", fullUrl);
 
-      // 3. Build final URL dynamically
-      const fullUrl = `${server_url}room=${roomId}&user=${userId}`;
-      console.log("Final URL:", fullUrl);
-
-      // 4. Fetch the token
       const resp = await fetch(fullUrl);
       const data = await resp.json();
       const token = data.token;
@@ -105,11 +78,11 @@ function App() {
       const newRoom = new Room();
       await newRoom.connect(process.env.REACT_APP_LIVEKIT_WS_URL, token);
 
-      setRoom(newRoom);
-      setConnected(true);
-
       const micTrack = await createLocalAudioTrack();
       await newRoom.localParticipant.publishTrack(micTrack);
+
+      setRoom(newRoom);
+      setConnected(true);
 
       console.log('Connected and microphone publishing.');
     } catch (err) {
@@ -120,10 +93,7 @@ function App() {
   const disconnectFromRoom = async () => {
     if (room) {
       await room.disconnect();
-      setConnected(false);
-      setRoom(null);
-      setChatMessages([]);
-      console.log('Disconnected.');
+      console.log('Disconnected manually.');
     }
   };
 
